@@ -181,24 +181,8 @@ def main() -> None:
     try:
         data = load_data()
     except RuntimeError as exc:
-        if "missing required tables" not in str(exc):
-            st.error(str(exc))
-            st.stop()
-
-        st.warning(f"{exc} Attempting automatic rebuild now.")
-        try:
-            from generate_simulated_data import seed_database
-
-            seed_database()
-            load_data.clear()
-            data = load_data()
-            st.success("Database rebuilt successfully from synthetic seed data.")
-        except Exception as rebuild_exc:
-            st.error(
-                f"{exc} Automatic rebuild failed: {rebuild_exc}. "
-                "Run `python generate_simulated_data.py` manually and reload."
-            )
-            st.stop()
+        st.error(str(exc))
+        st.stop()
 
     kpis = build_kpis(data)
 
