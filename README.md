@@ -1,67 +1,43 @@
-# CrediVision Executive Demo
+# CreditVision Demo App
 
-CrediVision Executive Demo is a board-level analytics product demonstration built on **fully synthetic lending data**. It showcases how executive teams can monitor portfolio delivery, branch productivity, risk movement, pipeline quality, scenarios, and forward outlook in one streamlined interface.
+A polished, demo-safe frontend designed for GitHub presentation and investor screenshots.
 
-## Overview
+## What this repo now includes
 
-This repository contains a premium-style Streamlit application designed for leadership presentations and investor briefings. The dataset is generated locally in SQLite and does not connect to any external systems or real institutions.
+- A top-of-page **landing section** that introduces the synthetic product story.
+- Consistent design language across overview, portfolio, and trends views.
+- Polished **empty-state/help text** in every section where data may be missing.
+- Synthetic/demo-safe labels and wording in every visible UI label.
+- Screenshot composition guidance for investor-ready captures.
 
-## Features
+## Quick start
 
-- Executive summary KPI cards (value achievement, count achievement, PAR30, PAR90, pending applications, average loans per officer, queue ratio)
-- Portfolio overview with a budget-vs-actual waterfall bridge and pipeline composition
-- Branch performance ranking for latest month disbursement output
-- Risk and arrears view with PAR trend monitoring
-- Scenario analysis comparing strategic operating assumptions
-- Forecast view with clear separation of historical and projected periods
-- Concise board commentary generated from current synthetic portfolio metrics
+Open `index.html` in any modern browser.
 
-## Architecture
+## Screenshot generation guidance
 
-The demo uses a simple synthetic SQL model:
+Use this checklist to capture investor-friendly screenshots:
 
-1. `simulated_schema.sql` defines operational and analytics tables.
-2. `generate_simulated_data.py` seeds deterministic synthetic records into `simulated_lending.db`.
-3. `app.py` loads SQLite data, computes KPIs, and renders presentation-grade Plotly visuals in Streamlit.
+1. **Viewport**: 16:9 ratio at 1440×810 or 1920×1080.
+2. **Theme**: Keep default light theme for clean deck readability.
+3. **Focus area**: Capture the landing + KPI row first, then each dashboard section.
+4. **Data framing**: Keep synthetic values visible; avoid cropping chart titles.
+5. **Empty states**: Include one screenshot that shows the polished no-data guidance.
+6. **Naming**: Save files with sequence numbers, e.g. `01-landing.png`, `02-overview.png`.
 
-### Simulated SQL Model
+Recommended screenshot set:
 
-Core entities include:
-- `branches`, `officers` for operating structure
-- `monthly_portfolio` for budget/actual and pipeline metrics
-- `monthly_risk` for PAR30, PAR90, and arrears indicators
-- `applications` for stage and composition analysis
-- `scenario_results` for executive what-if comparisons
-- `forecast` for historical + forecast periods
+- `01-landing.png` — Hero and value proposition.
+- `02-overview-kpis.png` — KPI cards and synthetic trend chart.
+- `03-portfolio.png` — Segment cards and allocation visuals.
+- `04-empty-state.png` — Help/empty guidance block.
 
-## How to Run
+## Demo-safe wording policy
 
-```bash
-python generate_simulated_data.py
-streamlit run app.py
-```
+This app intentionally uses synthetic content for safe demos:
 
-## Screenshots
-
-Launch the app and capture presentation screenshots from:
-- Executive Summary
-- Portfolio Overview
-- Branch Performance
-- Risk and Arrears
-- Scenario Analysis
-- Forecasts
-
-## Use Cases
-
-- Board pack and steering committee dry-runs
-- Investor narrative rehearsal using synthetic performance data
-- Analytics UI prototyping for lending portfolio governance
-- Internal enablement and training for portfolio monitoring workflows
-
-## Notes
-
-- All data is synthetic and generated locally.
-- No live API or external core banking connection is used.
-- This is a product demo, not a production decisioning platform.
-
+- No real customer names.
+- No real account identifiers.
+- No regulated-credit decisions.
+- Labels use neutral terms (e.g., “Demo Segment A”, “Synthetic Utilization Trend”).
 
