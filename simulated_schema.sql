@@ -70,3 +70,4 @@ CREATE TABLE forecast (
   projected_disbursement REAL NOT NULL,
   projected_par30 REAL NOT NULL
 );
+
