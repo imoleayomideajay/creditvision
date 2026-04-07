@@ -20,7 +20,26 @@ def pct(value: float) -> str:
 
 @st.cache_data
 def load_data() -> dict[str, pd.DataFrame]:
+    expected_tables = {
+        "monthly_portfolio",
+        "monthly_risk",
+        "branches",
+        "officers",
+        "applications",
+        "scenario_results",
+        "forecast",
+    }
     with sqlite3.connect(DB_PATH) as conn:
+        table_df = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type = 'table'", conn)
+        available_tables = set(table_df["name"])
+        missing_tables = sorted(expected_tables - available_tables)
+        if missing_tables:
+            missing = ", ".join(missing_tables)
+            raise RuntimeError(
+                "simulated_lending.db is missing required tables: "
+                f"{missing}. Rebuild the database with `python generate_simulated_data.py`."
+            )
+
         frames = {
             "portfolio": pd.read_sql_query("SELECT * FROM monthly_portfolio", conn),
             "risk": pd.read_sql_query("SELECT * FROM monthly_risk", conn),
@@ -159,7 +178,28 @@ def main() -> None:
         st.error("simulated_lending.db was not found. Run `python generate_simulated_data.py`.")
         st.stop()
 
-    data = load_data()
+    try:
+        data = load_data()
+    except RuntimeError as exc:
+        if "missing required tables" not in str(exc):
+            st.error(str(exc))
+            st.stop()
+
+        st.warning(f"{exc} Attempting automatic rebuild now.")
+        try:
+            from generate_simulated_data import seed_database
+
+            seed_database()
+            load_data.clear()
+            data = load_data()
+            st.success("Database rebuilt successfully from synthetic seed data.")
+        except Exception as rebuild_exc:
+            st.error(
+                f"{exc} Automatic rebuild failed: {rebuild_exc}. "
+                "Run `python generate_simulated_data.py` manually and reload."
+            )
+            st.stop()
+
     kpis = build_kpis(data)
 
     st.info("This product demo uses fully synthetic data generated for showcase purposes only.")
@@ -198,4 +238,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
