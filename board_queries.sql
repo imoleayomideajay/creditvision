@@ -28,3 +28,4 @@ JOIN monthly_risk mr
 WHERE mp.month_date = (SELECT MAX(month_date) FROM monthly_portfolio)
 GROUP BY b.branch_name
 ORDER BY actual_disbursement DESC;
+
