@@ -93,6 +93,36 @@ def build_kpis(data: dict[str, pd.DataFrame]) -> dict[str, float]:
     }
 
 
+def apply_filters(
+    data: dict[str, pd.DataFrame],
+    selected_regions: list[str],
+    selected_branches: list[str],
+    month_window: tuple[pd.Timestamp, pd.Timestamp],
+) -> dict[str, pd.DataFrame]:
+    filtered = {k: v.copy() for k, v in data.items()}
+
+    branches = filtered["branches"].copy()
+    if selected_regions:
+        branches = branches[branches["region"].isin(selected_regions)]
+    if selected_branches:
+        branches = branches[branches["branch_name"].isin(selected_branches)]
+
+    branch_ids = set(branches["branch_id"])
+    if branch_ids:
+        for frame_key in ["portfolio", "risk", "applications", "officers"]:
+            filtered[frame_key] = filtered[frame_key][filtered[frame_key]["branch_id"].isin(branch_ids)]
+    else:
+        for frame_key in ["portfolio", "risk", "applications", "officers"]:
+            filtered[frame_key] = filtered[frame_key].iloc[0:0]
+
+    start, end = month_window
+    for frame_key in ["portfolio", "risk", "applications", "forecast"]:
+        filtered[frame_key] = filtered[frame_key].query("month_date >= @start and month_date <= @end")
+
+    filtered["branches"] = branches
+    return filtered
+
+
 def waterfall_budget_vs_actual(data: pd.DataFrame) -> go.Figure:
     latest = data["month_date"].max()
     current = data.query("month_date == @latest")
@@ -214,7 +244,7 @@ def main() -> None:
             st.error(str(exc))
             st.stop()
 
-    kpis = build_kpis(data)
+    kpis = build_kpis(filtered)
 
     st.info("This product demo uses fully synthetic data generated for showcase purposes only.")
 
@@ -234,20 +264,20 @@ def main() -> None:
 
     st.subheader("Portfolio Overview")
     p1, p2 = st.columns(2)
-    p1.plotly_chart(waterfall_budget_vs_actual(data["portfolio"]), use_container_width=True)
-    p2.plotly_chart(pipeline_mix(data["applications"]), use_container_width=True)
+    p1.plotly_chart(waterfall_budget_vs_actual(filtered["portfolio"]), use_container_width=True)
+    p2.plotly_chart(pipeline_mix(filtered["applications"]), use_container_width=True)
 
     st.subheader("Branch Performance")
-    st.plotly_chart(branch_ranking(data["portfolio"], data["branches"]), use_container_width=True)
+    st.plotly_chart(branch_ranking(filtered["portfolio"], filtered["branches"]), use_container_width=True)
 
     st.subheader("Risk and Arrears")
-    st.plotly_chart(delinquency_trend(data["risk"]), use_container_width=True)
+    st.plotly_chart(delinquency_trend(filtered["risk"]), use_container_width=True)
 
     st.subheader("Scenario Analysis")
-    st.plotly_chart(scenario_chart(data["scenarios"]), use_container_width=True)
+    st.plotly_chart(scenario_chart(filtered["scenarios"]), use_container_width=True)
 
     st.subheader("Forecasts")
-    st.plotly_chart(forecast_chart(data["forecast"]), use_container_width=True)
+    st.plotly_chart(forecast_chart(filtered["forecast"]), use_container_width=True)
 
 
 if __name__ == "__main__":
