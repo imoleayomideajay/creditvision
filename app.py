@@ -1,4 +1,6 @@
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -52,6 +54,20 @@ def load_data() -> dict[str, pd.DataFrame]:
     for key in ["portfolio", "risk", "applications", "forecast"]:
         frames[key]["month_date"] = pd.to_datetime(frames[key]["month_date"])
     return frames
+
+
+def rebuild_database() -> None:
+    result = subprocess.run(
+        [sys.executable, "generate_simulated_data.py"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        raise RuntimeError(
+            "Failed to rebuild simulated_lending.db with `python generate_simulated_data.py`."
+            + (f" Details: {stderr}" if stderr else "")
+        )
 
 
 def build_kpis(data: dict[str, pd.DataFrame]) -> dict[str, float]:
@@ -175,14 +191,28 @@ def main() -> None:
     st.caption("Synthetic lending analytics showcase for board and investor discussions.")
 
     if not DB_PATH.exists():
-        st.error("simulated_lending.db was not found. Run `python generate_simulated_data.py`.")
-        st.stop()
+        with st.spinner("simulated_lending.db not found. Rebuilding synthetic data..."):
+            try:
+                rebuild_database()
+            except RuntimeError as exc:
+                st.error(str(exc))
+                st.stop()
 
     try:
         data = load_data()
     except RuntimeError as exc:
-        st.error(str(exc))
-        st.stop()
+        if "missing required tables" in str(exc):
+            with st.spinner("Database schema is incomplete. Rebuilding synthetic data..."):
+                try:
+                    rebuild_database()
+                    load_data.clear()
+                    data = load_data()
+                except RuntimeError as rebuild_exc:
+                    st.error(str(rebuild_exc))
+                    st.stop()
+        else:
+            st.error(str(exc))
+            st.stop()
 
     kpis = build_kpis(data)
 
