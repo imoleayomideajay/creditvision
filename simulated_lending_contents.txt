@@ -1,0 +1,7 @@
+applications: 2700
+branches: 5
+forecast: 15
+monthly_portfolio: 135
+monthly_risk: 135
+officers: 35
+scenario_results: 4
