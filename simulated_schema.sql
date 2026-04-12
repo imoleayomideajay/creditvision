@@ -1,12 +1,12 @@
 PRAGMA foreign_keys = ON;
 
-DROP TABLE IF EXISTS branches;
-DROP TABLE IF EXISTS officers;
 DROP TABLE IF EXISTS monthly_portfolio;
 DROP TABLE IF EXISTS monthly_risk;
 DROP TABLE IF EXISTS applications;
+DROP TABLE IF EXISTS officers;
 DROP TABLE IF EXISTS scenario_results;
 DROP TABLE IF EXISTS forecast;
+DROP TABLE IF EXISTS branches;
 
 CREATE TABLE branches (
   branch_id INTEGER PRIMARY KEY,
@@ -70,4 +70,3 @@ CREATE TABLE forecast (
   projected_disbursement REAL NOT NULL,
   projected_par30 REAL NOT NULL
 );
-
