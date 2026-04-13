@@ -244,6 +244,42 @@ def main() -> None:
             st.error(str(exc))
             st.stop()
 
+    filtered = data
+    try:
+        min_month = data["portfolio"]["month_date"].min()
+        max_month = data["portfolio"]["month_date"].max()
+
+        st.sidebar.header("Filters")
+        regions = sorted(data["branches"]["region"].unique())
+        selected_regions = st.sidebar.multiselect("Region", options=regions, default=regions)
+
+        branch_source = data["branches"].copy()
+        if selected_regions:
+            branch_source = branch_source[branch_source["region"].isin(selected_regions)]
+        branch_options = sorted(branch_source["branch_name"].unique())
+        selected_branches = st.sidebar.multiselect("Branch", options=branch_options, default=branch_options)
+
+        start_month, end_month = st.sidebar.slider(
+            "Month range",
+            min_value=min_month.to_pydatetime(),
+            max_value=max_month.to_pydatetime(),
+            value=(min_month.to_pydatetime(), max_month.to_pydatetime()),
+            format="MMM YYYY",
+        )
+
+        filtered = apply_filters(
+            data,
+            selected_regions=selected_regions,
+            selected_branches=selected_branches,
+            month_window=(pd.Timestamp(start_month), pd.Timestamp(end_month)),
+        )
+    except Exception as exc:
+        st.warning(f"Filter controls are temporarily unavailable; showing full dataset. Details: {exc}")
+
+    if filtered["portfolio"].empty or filtered["risk"].empty:
+        st.warning("No data matches the current filter selection. Try broadening filters.")
+        st.stop()
+
     kpis = build_kpis(filtered)
 
     st.info("This product demo uses fully synthetic data generated for showcase purposes only.")
