@@ -1,4 +1,6 @@
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -54,6 +56,20 @@ def load_data() -> dict[str, pd.DataFrame]:
     return frames
 
 
+def rebuild_database() -> None:
+    result = subprocess.run(
+        [sys.executable, "generate_simulated_data.py"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        stderr = result.stderr.strip()
+        raise RuntimeError(
+            "Failed to rebuild simulated_lending.db with `python generate_simulated_data.py`."
+            + (f" Details: {stderr}" if stderr else "")
+        )
+
+
 def build_kpis(data: dict[str, pd.DataFrame]) -> dict[str, float]:
     latest = data["portfolio"]["month_date"].max()
     p = data["portfolio"].query("month_date == @latest")
@@ -75,6 +91,36 @@ def build_kpis(data: dict[str, pd.DataFrame]) -> dict[str, float]:
         "avg_loans_per_officer": avg_loans_per_officer,
         "queue_ratio": queue_ratio,
     }
+
+
+def apply_filters(
+    data: dict[str, pd.DataFrame],
+    selected_regions: list[str],
+    selected_branches: list[str],
+    month_window: tuple[pd.Timestamp, pd.Timestamp],
+) -> dict[str, pd.DataFrame]:
+    filtered = {k: v.copy() for k, v in data.items()}
+
+    branches = filtered["branches"].copy()
+    if selected_regions:
+        branches = branches[branches["region"].isin(selected_regions)]
+    if selected_branches:
+        branches = branches[branches["branch_name"].isin(selected_branches)]
+
+    branch_ids = set(branches["branch_id"])
+    if branch_ids:
+        for frame_key in ["portfolio", "risk", "applications", "officers"]:
+            filtered[frame_key] = filtered[frame_key][filtered[frame_key]["branch_id"].isin(branch_ids)]
+    else:
+        for frame_key in ["portfolio", "risk", "applications", "officers"]:
+            filtered[frame_key] = filtered[frame_key].iloc[0:0]
+
+    start, end = month_window
+    for frame_key in ["portfolio", "risk", "applications", "forecast"]:
+        filtered[frame_key] = filtered[frame_key].query("month_date >= @start and month_date <= @end")
+
+    filtered["branches"] = branches
+    return filtered
 
 
 def waterfall_budget_vs_actual(data: pd.DataFrame) -> go.Figure:
@@ -175,16 +221,66 @@ def main() -> None:
     st.caption("Synthetic lending analytics showcase for board and investor discussions.")
 
     if not DB_PATH.exists():
-        st.error("simulated_lending.db was not found. Run `python generate_simulated_data.py`.")
-        st.stop()
+        with st.spinner("simulated_lending.db not found. Rebuilding synthetic data..."):
+            try:
+                rebuild_database()
+            except RuntimeError as exc:
+                st.error(str(exc))
+                st.stop()
 
     try:
         data = load_data()
     except RuntimeError as exc:
-        st.error(str(exc))
+        if "missing required tables" in str(exc):
+            with st.spinner("Database schema is incomplete. Rebuilding synthetic data..."):
+                try:
+                    rebuild_database()
+                    load_data.clear()
+                    data = load_data()
+                except RuntimeError as rebuild_exc:
+                    st.error(str(rebuild_exc))
+                    st.stop()
+        else:
+            st.error(str(exc))
+            st.stop()
+
+    filtered = data
+    try:
+        min_month = data["portfolio"]["month_date"].min()
+        max_month = data["portfolio"]["month_date"].max()
+
+        st.sidebar.header("Filters")
+        regions = sorted(data["branches"]["region"].unique())
+        selected_regions = st.sidebar.multiselect("Region", options=regions, default=regions)
+
+        branch_source = data["branches"].copy()
+        if selected_regions:
+            branch_source = branch_source[branch_source["region"].isin(selected_regions)]
+        branch_options = sorted(branch_source["branch_name"].unique())
+        selected_branches = st.sidebar.multiselect("Branch", options=branch_options, default=branch_options)
+
+        start_month, end_month = st.sidebar.slider(
+            "Month range",
+            min_value=min_month.to_pydatetime(),
+            max_value=max_month.to_pydatetime(),
+            value=(min_month.to_pydatetime(), max_month.to_pydatetime()),
+            format="MMM YYYY",
+        )
+
+        filtered = apply_filters(
+            data,
+            selected_regions=selected_regions,
+            selected_branches=selected_branches,
+            month_window=(pd.Timestamp(start_month), pd.Timestamp(end_month)),
+        )
+    except Exception as exc:
+        st.warning(f"Filter controls are temporarily unavailable; showing full dataset. Details: {exc}")
+
+    if filtered["portfolio"].empty or filtered["risk"].empty:
+        st.warning("No data matches the current filter selection. Try broadening filters.")
         st.stop()
 
-    kpis = build_kpis(data)
+    kpis = build_kpis(filtered)
 
     st.info("This product demo uses fully synthetic data generated for showcase purposes only.")
 
@@ -204,20 +300,20 @@ def main() -> None:
 
     st.subheader("Portfolio Overview")
     p1, p2 = st.columns(2)
-    p1.plotly_chart(waterfall_budget_vs_actual(data["portfolio"]), use_container_width=True)
-    p2.plotly_chart(pipeline_mix(data["applications"]), use_container_width=True)
+    p1.plotly_chart(waterfall_budget_vs_actual(filtered["portfolio"]), use_container_width=True)
+    p2.plotly_chart(pipeline_mix(filtered["applications"]), use_container_width=True)
 
     st.subheader("Branch Performance")
-    st.plotly_chart(branch_ranking(data["portfolio"], data["branches"]), use_container_width=True)
+    st.plotly_chart(branch_ranking(filtered["portfolio"], filtered["branches"]), use_container_width=True)
 
     st.subheader("Risk and Arrears")
-    st.plotly_chart(delinquency_trend(data["risk"]), use_container_width=True)
+    st.plotly_chart(delinquency_trend(filtered["risk"]), use_container_width=True)
 
     st.subheader("Scenario Analysis")
-    st.plotly_chart(scenario_chart(data["scenarios"]), use_container_width=True)
+    st.plotly_chart(scenario_chart(filtered["scenarios"]), use_container_width=True)
 
     st.subheader("Forecasts")
-    st.plotly_chart(forecast_chart(data["forecast"]), use_container_width=True)
+    st.plotly_chart(forecast_chart(filtered["forecast"]), use_container_width=True)
 
 
 if __name__ == "__main__":
